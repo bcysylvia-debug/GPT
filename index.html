@@ -2,140 +2,208 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>塔罗牌占卜</title>
-
+<title>塔罗占卜 Tarot Divination</title>
 <style>
 body {
+  font-family: "Microsoft YaHei", sans-serif;
+  background: #1b1b1b;
+  color: #eee;
   margin: 0;
   padding: 20px;
-  background: #f6f1ea;
-  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+h1, h2 {
   text-align: center;
 }
-
-h1 {
-  margin-bottom: 10px;
+section {
+  margin-bottom: 60px;
 }
-
 button {
-  padding: 10px 20px;
-  font-size: 16px;
-  cursor: pointer;
-  border: none;
-  background: #333;
+  background: #6b4eff;
   color: #fff;
+  border: none;
+  padding: 8px 14px;
+  margin: 5px;
+  cursor: pointer;
   border-radius: 6px;
 }
-
-#tip {
-  margin-top: 12px;
-  color: #555;
+button:hover {
+  background: #8a74ff;
 }
-
-#cards {
-  margin-top: 20px;
+.card-area {
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 20px;
+  flex-wrap: wrap;
 }
-
-/* 牌背尺寸（小） */
 .card {
-  width: 70px;
-  height: 110px;
-  background-image: url("https://upload.wikimedia.org/wikipedia/commons/thumb/5/54/Tarot_card_back.jpg/256px-Tarot_card_back.jpg");
-  background-size: cover;
-  background-position: center;
-  border-radius: 6px;
+  width: 120px;
+  height: 200px;
+  perspective: 1000px;
+  position: relative;
   cursor: pointer;
-  transition: transform 0.3s;
+}
+.card img {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+}
+.card.reversed img {
+  transform: rotate(180deg);
+}
+.label {
+  text-align: center;
+  margin-top: 6px;
+  font-size: 14px;
 }
 
-/* 翻开后的尺寸（不要太大） */
-.card.open {
-  width: 130px;
-  height: 210px;
+/* 自由牌桌 */
+.table {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 80px);
+  gap: 10px;
+  justify-content: center;
+}
+.table .card {
+  width: 80px;
+  height: 130px;
+}
+.card.opened {
+  transform: scale(1.6);
+  z-index: 10;
+}
+
+/* Yes No */
+.result-text {
+  position: absolute;
+  bottom: 10px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  background: rgba(0,0,0,0.6);
+  font-size: 14px;
+  padding: 4px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>自由抽塔罗</h1>
-<button id="drawBtn">随机抽取三张牌</button>
-<div id="tip">点击按钮开始占卜</div>
+<h1>🔮 塔罗占卜网页</h1>
 
-<div id="cards"></div>
+<!-- 圣三角 -->
+<section>
+  <h2>圣三角占卜（过去 / 现在 / 未来）</h2>
+  <div style="text-align:center">
+    <button onclick="drawTriangle()">随机抽牌</button>
+  </div>
+  <div class="card-area" id="triangle"></div>
+</section>
+
+<!-- 自由牌桌 -->
+<section>
+  <h2>自由无牌阵（自由牌桌）</h2>
+  <div style="text-align:center">
+    <button onclick="randomFree()">随机抽三张</button>
+  </div>
+  <div class="table" id="freeTable"></div>
+</section>
+
+<!-- Yes / No -->
+<section>
+  <h2>Yes / No 决策占卜</h2>
+  <div style="text-align:center">
+    <button onclick="drawYesNo()">抽一张牌</button>
+  </div>
+  <div class="card-area" id="yesno"></div>
+</section>
 
 <script>
-/*
-  使用 Rider–Waite 塔罗（Wikimedia 公共资源）
-  稳定、免费、无需自己导图
-*/
-const tarotImages = [
-  "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_04_Emperor.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_06_Lovers.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/e/e0/RWS_Tarot_11_Justice.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_12_Hanged_Man.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/f/f8/RWS_Tarot_14_Temperance.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/5/55/RWS_Tarot_15_Devil.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_16_Tower.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/d/db/RWS_Tarot_17_Star.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/7/7f/RWS_Tarot_18_Moon.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/1/17/RWS_Tarot_19_Sun.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgement.jpg",
-  "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg"
+// ===== 牌库 =====
+const tarotImages = Array.from({length:78},(_,i)=>`https://upload.wikimedia.org/wikipedia/commons/${(i%9)+1}/${(i%9)+1}${i}.jpg`);
+const cardBack = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Tarot_card_back.jpg/300px-Tarot_card_back.jpg";
+
+// Yes No 精简牌
+const yesNoDeck = [
+  {name:"Ace", result:"等待时机"},
+  {name:"Ace", result:"等待时机"},
+  {name:"Ace", result:"等待时机"},
+  {name:"Ace", result:"等待时机"},
+  {name:"圣杯九", result:"明确的是"},
+  {name:"愚人", result:"明确的是"},
+  {name:"魔术师", result:"明确的是"},
+  {name:"皇后", result:"明确的是"},
+  {name:"皇帝", result:"明确的是"},
+  {name:"战车", result:"明确的是"},
+  {name:"正义", result:"明确的是"},
+  {name:"星星", result:"明确的是"},
+  {name:"太阳", result:"明确的是"},
+  {name:"世界", result:"明确的是"},
+  {name:"力量", result:"明确的否"},
+  {name:"高塔", result:"明确的否"},
+  {name:"节制", result:"明确的否"},
+  {name:"隐士", result:"明确的否"},
+  {name:"吊人", result:"明确的否"},
+  {name:"死神", result:"明确的否"},
+  {name:"魔鬼", result:"明确的否"},
+  {name:"女教主", result:"直觉判断"},
+  {name:"命运之轮", result:"直觉判断"},
+  {name:"恋人", result:"直觉判断"},
+  {name:"教皇", result:"直觉判断"},
+  {name:"月亮", result:"直觉判断"},
+  {name:"审判", result:"直觉判断"}
 ];
 
-const cardsDiv = document.getElementById("cards");
-const tip = document.getElementById("tip");
-const btn = document.getElementById("drawBtn");
-
-btn.onclick = () => {
-  cardsDiv.innerHTML = "";
-  tip.innerText = "请依次点击翻开三张牌";
-
-  const selected = shuffle(tarotImages).slice(0, 3);
-
-  selected.forEach(img => {
-    const card = document.createElement("div");
-    card.className = "card";
-    card.dataset.img = img;
-    cardsDiv.appendChild(card);
-  });
-};
-
-cardsDiv.onclick = e => {
-  const card = e.target;
-  if (!card.classList.contains("card")) return;
-  if (card.classList.contains("open")) return;
-
-  card.classList.add("open");
-  card.style.backgroundImage = `url(${card.dataset.img})`;
-
-  if (document.querySelectorAll(".card.open").length === 3) {
-    tip.innerText = "占卜完成 ✨";
+// ===== 圣三角 =====
+function drawTriangle(){
+  const labels=["过去","现在","未来"];
+  const area=document.getElementById("triangle");
+  area.innerHTML="";
+  for(let i=0;i<3;i++){
+    const img=tarotImages[Math.floor(Math.random()*tarotImages.length)];
+    const reversed=Math.random()<0.5;
+    area.innerHTML+=`
+      <div>
+        <div class="card ${reversed?"reversed":""}">
+          <img src="${img}">
+        </div>
+        <div class="label">${labels[i]} ${reversed?"（逆位）":"（正位）"}</div>
+      </div>`;
   }
-};
+}
 
-function shuffle(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
+// ===== 自由牌桌 =====
+const freeTable=document.getElementById("freeTable");
+for(let i=0;i<78;i++){
+  const div=document.createElement("div");
+  div.className="card";
+  div.innerHTML=`<img src="${cardBack}">`;
+  div.onclick=function(){
+    if(div.classList.contains("opened")) return;
+    const img=tarotImages[i];
+    const rev=Math.random()<0.5;
+    div.innerHTML=`<img src="${img}" style="transform:${rev?'rotate(180deg)':''}">`;
+    div.classList.add("opened");
   }
-  return a;
+  freeTable.appendChild(div);
+}
+function randomFree(){
+  [...freeTable.children].forEach(c=>c.classList.remove("opened"));
+  for(let i=0;i<3;i++){
+    freeTable.children[Math.floor(Math.random()*78)].click();
+  }
+}
+
+// ===== Yes / No =====
+function drawYesNo(){
+  const area=document.getElementById("yesno");
+  area.innerHTML="";
+  const card=yesNoDeck[Math.floor(Math.random()*yesNoDeck.length)];
+  const img=tarotImages[Math.floor(Math.random()*tarotImages.length)];
+  area.innerHTML=`
+    <div class="card">
+      <img src="${img}">
+      <div class="result-text">${card.result}</div>
+    </div>`;
 }
 </script>
 
