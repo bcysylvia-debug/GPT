@@ -1,209 +1,444 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<title>塔罗占卜 Tarot</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>塔罗工坊 - 完美修复版</title>
+    <style>
+        :root {
+            --primary-color: #e0c097;
+            --bg-gradient: radial-gradient(circle at center, #1a002a 0%, #050008 100%);
+            --card-back-pattern: repeating-linear-gradient(45deg, #4a2c5a, #4a2c5a 2px, #2a0c3a 2px, #2a0c3a 4px);
+        }
 
-<style>
-body {
-  margin: 0;
-  padding: 20px;
-  background: #141414;
-  color: #eee;
-  font-family: "Microsoft YaHei", sans-serif;
-}
-h1, h2 {
-  text-align: center;
-  margin-bottom: 10px;
-}
-section {
-  margin-bottom: 60px;
-}
-button {
-  background: #6a5cff;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 14px;
-  cursor: pointer;
-  margin: 5px;
-}
-button:hover {
-  background: #8579ff;
-}
+        body {
+            background: var(--bg-gradient);
+            color: var(--primary-color);
+            font-family: 'STKaiti', 'Georgia', serif;
+            display: flex; flex-direction: column; align-items: center;
+            min-height: 100vh; margin: 0; padding: 5px; 
+            padding-bottom: 160px; /* 给底部结果栏留出空间 */
+            overflow-x: hidden;
+        }
 
-/* 卡牌 */
-.card-area {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-  flex-wrap: wrap;
-}
-.card {
-  width: 120px;
-  height: 200px;
-  position: relative;
-  cursor: pointer;
-  transition: transform .3s;
-}
-.card img {
-  width: 100%;
-  height: 100%;
-  border-radius: 10px;
-}
-.reversed img {
-  transform: rotate(180deg);
-}
-.label {
-  text-align: center;
-  margin-top: 6px;
-  font-size: 14px;
-}
+        h1 { font-size: 1.1rem; margin: 8px 0; text-shadow: 0 0 8px rgba(224, 192, 151, 0.5); }
 
-/* 自由牌桌 */
-.table {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 80px);
-  gap: 10px;
-  justify-content: center;
-}
-.table .card {
-  width: 80px;
-  height: 130px;
-}
-.opened {
-  transform: scale(1.6);
-  z-index: 99;
-}
+        /* 导航与按钮 */
+        .nav-group { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; justify-content: center; }
+        .nav-btn {
+            background: rgba(90, 56, 117, 0.3); border: 1px solid var(--primary-color);
+            color: var(--primary-color); padding: 5px 12px; border-radius: 4px;
+            cursor: pointer; font-size: 12px; transition: 0.2s;
+        }
+        .nav-btn.active { background: var(--primary-color); color: #1a002a; font-weight: bold; }
+        
+        .action-btn {
+            background: linear-gradient(45deg, #5a3875, #8a58a8); border: none;
+            color: white; padding: 6px 20px; border-radius: 15px;
+            cursor: pointer; font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
 
-/* Yes No 结果 */
-.result {
-  position: absolute;
-  bottom: 8px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  background: rgba(0,0,0,.6);
-  font-size: 14px;
-  padding: 4px;
-}
-</style>
+        #status-bar { margin-bottom: 5px; color: #b893cc; font-size: 12px; height: 16px; text-align: center;}
+
+        /* === 牌桌网格 === */
+        #deck-grid {
+            display: grid; 
+            grid-template-columns: repeat(10, 1fr); /* 10列布局 */
+            gap: 3px; width: 96vw; max-width: 500px;
+            margin-top: 5px;
+        }
+        .grid-yesno { grid-template-columns: repeat(7, 1fr) !important; }
+
+        .card-slot {
+            aspect-ratio: 2/3.5; position: relative; cursor: pointer;
+            perspective: 600px;
+        }
+
+        .card-inner {
+            width: 100%; height: 100%; position: relative;
+            transform-style: preserve-3d; transition: transform 0.6s;
+            border-radius: 3px; box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+        }
+
+        .card-slot.flipped .card-inner { transform: rotateY(180deg); }
+        /* 自由模式选中后，稍微变暗一点点表示已选 */
+        .card-slot.selected-mark { filter: brightness(0.6); }
+
+        .card-back, .card-front {
+            width: 100%; height: 100%; position: absolute;
+            backface-visibility: hidden; 
+        }
+
+        .card-back { background: var(--card-back-pattern); border: 1px solid #3a1c4a; }
+
+        .card-front {
+            background: #1a002a; transform: rotateY(180deg);
+            border: 1px solid var(--primary-color);
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+
+        .card-front img { width: 100%; height: 100%; object-fit: cover; }
+        /* 逆位旋转：直接旋转图片 */
+        .card-front img.reversed { transform: rotate(180deg); }
+
+        /* === 底部固定结果栏 (自由模式) === */
+        #bottom-result-bar {
+            position: fixed; bottom: 0; left: 0; width: 100%;
+            height: 140px; background: rgba(10, 0, 15, 0.95);
+            border-top: 1px solid #5a3875;
+            z-index: 100;
+            display: none; /* 默认隐藏 */
+            flex-direction: row; align-items: center;
+            overflow-x: auto; padding: 0 10px; gap: 10px;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+        }
+        
+        .result-item {
+            flex: 0 0 auto; width: 70px; display: flex; flex-direction: column; align-items: center;
+            animation: slideUp 0.3s ease-out;
+        }
+        .result-img-box {
+            width: 70px; height: 110px; border-radius: 4px; border: 1px solid #b893cc;
+            overflow: hidden; background: #000; position: relative;
+        }
+        .result-img-box img { width: 100%; height: 100%; object-fit: cover; }
+        .result-name { font-size: 10px; color: #e0c097; margin-top: 3px; text-align: center; white-space: nowrap;}
+        
+        .empty-tip { width:100%; text-align:center; color: #666; font-size: 12px; }
+
+        /* === 圣三角/YesNo 结果展示区 === */
+        .result-container { display: flex; justify-content: center; gap: 10px; width: 100%; flex-wrap: wrap; }
+        .tri-card { width: 30vw; max-width: 110px; text-align: center; margin-bottom: 10px; animation: fadeIn 0.5s; }
+        .tri-label { font-size: 12px; color: #b893cc; margin-bottom: 4px; }
+        
+        .yn-box {
+            background: rgba(30,0,50,0.9); border: 1px solid #5a3875;
+            padding: 15px; border-radius: 12px; text-align: center; width: 85%;
+            margin-top: 10px; animation: fadeIn 0.5s;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    </style>
 </head>
-
 <body>
 
-<h1>🔮 塔罗占卜屋</h1>
+    <h1>🔮 塔罗在线工坊</h1>
+    
+    <div class="nav-group">
+        <button class="nav-btn active" id="tab-triangle" onclick="switchTab('triangle')">圣三角</button>
+        <button class="nav-btn" id="tab-free" onclick="switchTab('free')">自由无牌阵</button>
+        <button class="nav-btn" id="tab-yesno" onclick="switchTab('yesno')">Yes / No</button>
+    </div>
 
-<!-- 圣三角 -->
-<section>
-  <h2>圣三角占卜（过去 / 现在 / 未来）</h2>
-  <div style="text-align:center">
-    <button onclick="drawTriangle()">随机抽牌</button>
-  </div>
-  <div class="card-area" id="triangle"></div>
-</section>
+    <div id="ctrl-triangle" class="nav-group">
+        <button onclick="setTriangleMode('random')" id="btn-tri-rnd" class="nav-btn active">随机抽</button>
+        <button onclick="setTriangleMode('manual')" id="btn-tri-man" class="nav-btn">手动选</button>
+        <button id="btn-tri-go" class="action-btn" onclick="executeTriangleDraw()">开始</button>
+    </div>
 
-<!-- 自由牌桌 -->
-<section>
-  <h2>自由无牌阵（自由牌桌）</h2>
-  <div style="text-align:center">
-    <button onclick="randomFree()">随机抽三张</button>
-  </div>
-  <div class="table" id="freeTable"></div>
-</section>
+    <div id="ctrl-free" class="nav-group" style="display:none;">
+        <button onclick="drawRandomFree()" class="action-btn">🎲 随机抽一张</button>
+        <button onclick="resetFree()" class="nav-btn">重置</button>
+    </div>
 
-<!-- Yes / No -->
-<section>
-  <h2>Yes / No 决策占卜</h2>
-  <div style="text-align:center">
-    <button onclick="drawYesNo()">抽一张牌</button>
-  </div>
-  <div class="card-area" id="yesno"></div>
-</section>
+    <div id="status-bar">准备就绪</div>
+
+    <div id="deck-grid"></div>
+
+    <div class="result-container" id="center-results"></div>
+
+    <div id="bottom-result-bar">
+        <div class="empty-tip">选中的牌会排列在这里...</div>
+    </div>
 
 <script>
-// ===== 稳定图片源 =====
-const base = "https://cdn.jsdelivr.net/gh/iamkun/dayjs@dev/docs/public/";
-const tarotImages = [];
-for (let i = 0; i < 78; i++) {
-  tarotImages.push(`${base}tarot_${i+1}.jpg`);
-}
-const cardBack = `${base}tarot_back.jpg`;
+    // === 图源重构：使用 Github 稳定源 (ekelen/tarot-api) ===
+    // 命名规则: m00-m21 (大阿卡纳), w01-w14 (权杖), c01-c14 (圣杯), s01-s14 (宝剑), p01-p14 (星币)
+    // 宫廷牌: 11=侍从, 12=骑士, 13=王后, 14=国王
+    const baseUrl = "https://wsrv.nl/?url=https://raw.githubusercontent.com/ekelen/tarot-api/master/static/images/";
+    const suffix = ".jpg&w=150&output=webp"; // 加速后缀
 
-// ===== Yes / No 牌库 =====
-const yesNoDeck = [
-  {result:"等待时机"},
-  {result:"等待时机"},
-  {result:"等待时机"},
-  {result:"等待时机"},
-  {result:"明确的是"},
-  {result:"明确的是"},
-  {result:"明确的是"},
-  {result:"明确的是"},
-  {result:"明确的是"},
-  {result:"明确的是"},
-  {result:"明确的否"},
-  {result:"明确的否"},
-  {result:"明确的否"},
-  {result:"明确的否"},
-  {result:"直觉判断"},
-  {result:"直觉判断"},
-  {result:"直觉判断"}
-];
+    let tarotDeck = [];
+    
+    function generateDeck() {
+        const suits = [
+            {code:'w', name:'权杖'}, {code:'c', name:'圣杯'}, 
+            {code:'s', name:'宝剑'}, {code:'p', name:'星币'}
+        ];
+        const ranks = [
+            "一", "二", "三", "四", "五", "六", "七", "八", "九", "十", 
+            "侍从", "骑士", "王后", "国王"
+        ];
+        const majors = [
+            "愚者","魔术师","女教皇","皇后","皇帝","教皇","恋人","战车","力量","隐士",
+            "命运之轮","正义","倒吊人","死神","节制","恶魔","高塔","星星","月亮","太阳","审判","世界"
+        ];
 
-// ===== 圣三角 =====
-function drawTriangle(){
-  const labels=["过去","现在","未来"];
-  const area=document.getElementById("triangle");
-  area.innerHTML="";
-  for(let i=0;i<3;i++){
-    const img=tarotImages[Math.floor(Math.random()*78)];
-    const rev=Math.random()<0.5;
-    area.innerHTML+=`
-      <div>
-        <div class="card ${rev?'reversed':''}">
-          <img src="${img}">
-        </div>
-        <div class="label">${labels[i]} ${rev?"逆位":"正位"}</div>
-      </div>`;
-  }
-}
+        let idCounter = 0;
 
-// ===== 自由牌桌 =====
-const table=document.getElementById("freeTable");
-for(let i=0;i<78;i++){
-  const c=document.createElement("div");
-  c.className="card";
-  c.innerHTML=`<img src="${cardBack}">`;
-  c.onclick=function(){
-    if(c.classList.contains("opened")) return;
-    const img=tarotImages[i];
-    const rev=Math.random()<0.5;
-    c.innerHTML=`<img src="${img}" style="transform:${rev?'rotate(180deg)':''}">`;
-    c.classList.add("opened");
-  }
-  table.appendChild(c);
-}
-function randomFree(){
-  [...table.children].forEach(c=>c.classList.remove("opened"));
-  for(let i=0;i<3;i++){
-    table.children[Math.floor(Math.random()*78)].click();
-  }
-}
+        // 大阿卡纳 0-21
+        majors.forEach((name, i) => {
+            let num = i.toString().padStart(2, '0');
+            tarotDeck.push({
+                id: idCounter++, 
+                name: name, 
+                img: `${baseUrl}m${num}${suffix}`,
+                isMajor: true
+            });
+        });
 
-// ===== Yes / No =====
-function drawYesNo(){
-  const area=document.getElementById("yesno");
-  area.innerHTML="";
-  const card=yesNoDeck[Math.floor(Math.random()*yesNoDeck.length)];
-  const img=tarotImages[Math.floor(Math.random()*78)];
-  area.innerHTML=`
-    <div class="card">
-      <img src="${img}">
-      <div class="result">${card.result}</div>
-    </div>`;
-}
+        // 小阿卡纳
+        suits.forEach(suit => {
+            ranks.forEach((rank, i) => {
+                let num = (i + 1).toString().padStart(2, '0'); // 01-14
+                tarotDeck.push({
+                    id: idCounter++,
+                    name: suit.name + rank,
+                    img: `${baseUrl}${suit.code}${num}${suffix}`,
+                    isMajor: false
+                });
+            });
+        });
+    }
+    generateDeck(); // 初始化牌库
+
+    // Yes/No 规则
+    const ynRules = {};
+    // 初始化规则: 大阿卡纳 + 4 Ace(22,36,50,64) + 圣杯九(44)
+    // 注意: 生成后的ID：权杖1=22, 圣杯1=36, 宝剑1=50, 星币1=64, 圣杯9=44
+    // 27张牌ID列表
+    const ynIds = [
+        ...Array.from({length:22}, (_,i)=>i), // 0-21
+        22, 36, 50, 64, 44
+    ];
+    
+    // 设置规则文本
+    const setRule = (ids, type) => ids.forEach(id => ynRules[id] = type);
+    setRule([22,36,50,64], 'WAIT');
+    setRule([44, 0,1,3,4,7,11,17,19,21], 'YES');
+    setRule([8,16,14,9,12,13,15], 'NO');
+    // 剩下的默认 OPEN
+
+    const ynText = { 'YES': '明确的是', 'NO': '明确的否', 'WAIT': '等待时机', 'OPEN': '依直觉解答' };
+
+    // === 全局状态 ===
+    let currentTab = 'triangle';
+    let triangleMode = 'random';
+    let shuffledIndices = [];
+    let freePicks = [];
+
+    // === 切换逻辑 ===
+    function switchTab(tab) {
+        currentTab = tab;
+        // 样式重置
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(`tab-${tab}`).classList.add('active');
+        
+        // 区域显示控制
+        document.getElementById('ctrl-triangle').style.display = 'none';
+        document.getElementById('ctrl-free').style.display = 'none';
+        document.getElementById('deck-grid').innerHTML = '';
+        document.getElementById('center-results').innerHTML = '';
+        document.getElementById('bottom-result-bar').style.display = 'none';
+        document.body.style.paddingBottom = "20px"; // 默认padding
+
+        if(tab === 'triangle') {
+            document.getElementById('ctrl-triangle').style.display = 'flex';
+            setTriangleMode('random');
+        } else if(tab === 'free') {
+            document.getElementById('ctrl-free').style.display = 'flex';
+            document.body.style.paddingBottom = "160px"; // 给底部栏留空
+            initFree();
+        } else if(tab === 'yesno') {
+            initYesNo();
+        }
+    }
+
+    // === 自由模式 (Free Mode) ===
+    function initFree() {
+        document.getElementById('status-bar').innerText = '点击牌背或按钮，结果将列在底部';
+        const grid = document.getElementById('deck-grid');
+        grid.className = '';
+        const bar = document.getElementById('bottom-result-bar');
+        bar.style.display = 'flex';
+        bar.innerHTML = '<div class="empty-tip">选中的牌会排列在这里...</div>';
+        freePicks = [];
+
+        shuffledIndices = shuffle(Array.from({length: 78}, (_, i) => i));
+
+        for(let i=0; i<78; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'card-slot';
+            slot.innerHTML = `
+                <div class="card-inner">
+                    <div class="card-back"></div>
+                    <div class="card-front"></div>
+                </div>
+            `;
+            // 绑定点击事件：点击牌背 -> 翻开并添加到下方
+            slot.onclick = () => activateFreeCard(i, slot);
+            grid.appendChild(slot);
+        }
+    }
+
+    function activateFreeCard(idx, slot) {
+        if(slot.classList.contains('flipped')) return; // 已翻开的不重复处理
+
+        const realId = shuffledIndices[idx];
+        const card = tarotDeck[realId];
+        const isRev = Math.random() > 0.5;
+
+        // 1. 原地翻牌 (小图，保持 grid 布局)
+        slot.classList.add('flipped');
+        slot.classList.add('selected-mark'); // 标记已选
+        const front = slot.querySelector('.card-front');
+        front.innerHTML = `<img src="${card.img}" class="${isRev ? 'reversed' : ''}">`;
+
+        // 2. 添加到底部栏
+        addToBottomBar(card, isRev);
+    }
+
+    function drawRandomFree() {
+        // 在没翻开的牌里随机选一张
+        const hiddenSlots = Array.from(document.querySelectorAll('.card-slot:not(.flipped)'));
+        if(hiddenSlots.length === 0) { alert('牌已抽完'); return; }
+        
+        const randomSlot = hiddenSlots[Math.floor(Math.random() * hiddenSlots.length)];
+        randomSlot.click(); // 触发点击逻辑
+        
+        // 滚动到底部查看
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+    }
+
+    function addToBottomBar(card, isRev) {
+        const bar = document.getElementById('bottom-result-bar');
+        if(freePicks.length === 0) bar.innerHTML = ''; // 清空提示
+        freePicks.push(card);
+
+        const div = document.createElement('div');
+        div.className = 'result-item';
+        div.innerHTML = `
+            <div class="result-img-box">
+                <img src="${card.img}" class="${isRev ? 'reversed' : ''}">
+            </div>
+            <div class="result-name">${card.name}${isRev?'(逆)':''}</div>
+        `;
+        bar.appendChild(div);
+        bar.scrollLeft = bar.scrollWidth; // 自动滚到最右
+    }
+    
+    function resetFree() {
+        if(confirm('重新开始？')) initFree();
+    }
+
+    // === Yes/No 模式 ===
+    function initYesNo() {
+        document.getElementById('status-bar').innerText = 'Yes/No 抉择 (27张限定)';
+        const grid = document.getElementById('deck-grid');
+        grid.className = 'grid-yesno';
+        shuffledIndices = shuffle([...ynIds]);
+
+        for(let i=0; i<27; i++) {
+            const slot = document.createElement('div');
+            slot.className = 'card-slot';
+            slot.innerHTML = '<div class="card-inner"><div class="card-back"></div></div>';
+            slot.onclick = () => showYesNoResult(shuffledIndices[i]);
+            grid.appendChild(slot);
+        }
+    }
+
+    function showYesNoResult(id) {
+        document.getElementById('deck-grid').innerHTML = ''; // 清空
+        const card = tarotDeck[id];
+        const type = ynRules[id] || 'OPEN';
+        const color = {'YES':'#4caf50','NO':'#f44336','WAIT':'#ff9800','OPEN':'#9c27b0'}[type];
+
+        document.getElementById('center-results').innerHTML = `
+            <div class="tri-card" style="width:120px">
+                <div class="result-img-box" style="width:120px; height:200px; border-color:${color}">
+                    <img src="${card.img}">
+                </div>
+                <div class="tri-label" style="margin-top:8px; font-size:14px;">${card.name}</div>
+            </div>
+            <div class="yn-box" style="border-color:${color}">
+                <h2 style="color:${color}; margin:0;">${type}</h2>
+                <p style="color:#ddd; margin:10px 0;">${ynText[type]}</p>
+                <button class="nav-btn" onclick="initYesNo()" style="margin-top:10px;">再抽一次</button>
+            </div>
+        `;
+    }
+
+    // === 圣三角模式 ===
+    let triManualPicks = [];
+    function setTriangleMode(mode) {
+        triangleMode = mode;
+        const grid = document.getElementById('deck-grid');
+        document.getElementById('btn-tri-rnd').classList.toggle('active', mode==='random');
+        document.getElementById('btn-tri-man').classList.toggle('active', mode==='manual');
+        document.getElementById('center-results').innerHTML = '';
+        
+        if(mode === 'random') {
+            grid.innerHTML = '';
+            document.getElementById('btn-tri-go').style.display = 'inline-block';
+            document.getElementById('status-bar').innerText = '点击开始直接抽取';
+        } else {
+            document.getElementById('btn-tri-go').style.display = 'none';
+            document.getElementById('status-bar').innerText = '请手动选 3 张';
+            grid.className = '';
+            shuffledIndices = shuffle(Array.from({length: 78}, (_, i) => i));
+            triManualPicks = [];
+            
+            for(let i=0; i<78; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'card-slot';
+                slot.innerHTML = '<div class="card-inner"><div class="card-back"></div></div>';
+                slot.onclick = () => {
+                    if(triManualPicks.length < 3 && !slot.style.opacity) {
+                        slot.style.opacity = '0.2'; // 视觉上变暗
+                        triManualPicks.push(shuffledIndices[i]);
+                        document.getElementById('status-bar').innerText = `已选 ${triManualPicks.length} / 3`;
+                        if(triManualPicks.length === 3) {
+                            grid.innerHTML = '';
+                            renderTriangle(triManualPicks);
+                        }
+                    }
+                };
+                grid.appendChild(slot);
+            }
+        }
+    }
+
+    function executeTriangleDraw() {
+        const ids = shuffle(Array.from({length: 78}, (_, i) => i)).slice(0,3);
+        renderTriangle(ids);
+    }
+
+    function renderTriangle(ids) {
+        const labels = ['过去', '现在', '未来'];
+        const html = ids.map((id, i) => {
+            const card = tarotDeck[id];
+            const isRev = Math.random() > 0.5;
+            return `
+                <div class="tri-card">
+                    <div class="tri-label">${labels[i]}</div>
+                    <div class="result-img-box" style="width:100%; aspect-ratio:2/3.5; height:auto;">
+                        <img src="${card.img}" class="${isRev?'reversed':''}">
+                    </div>
+                    <div class="tri-label" style="margin-top:5px;">${card.name}${isRev?'(逆)':''}</div>
+                </div>
+            `;
+        }).join('');
+        document.getElementById('center-results').innerHTML = html;
+        document.getElementById('status-bar').innerText = '解读完成';
+    }
+
+    function shuffle(arr) { return arr.sort(() => Math.random() - 0.5); }
+
+    window.onload = () => switchTab('triangle');
+
 </script>
-
 </body>
 </html>
